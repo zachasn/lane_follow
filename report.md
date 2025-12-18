@@ -2,23 +2,25 @@
 
 ## Introduction/Motivation
 
-Autonomous navigation is one of the most fundamental challenges in robotics, with applications ranging from self-driving vehicles to warehouse automation. This project implements a lane-following system for a simulated TurtleBot3 robot, demonstrating how a robot can perceive its environment through computer vision and translate visual information into real-time motion control.
+Autonomous navigation is a core challenge in robotics with real-world applications in self-driving cars, delivery robots, and warehouse automation. This project focuses on building a lane-following system for a simulated TurtleBot3 robot. The goal is to show how a robot can use its camera sensor to see the environment and convert that visual data into movement commands.
 
-The motivation for this project stems from the desire to understand and implement the core "Sense-Plan-Act" paradigm that underlies most autonomous systems. Lane following serves as an ideal introductory problem because it encapsulates essential robotics concepts in a constrained, well-defined environment. The robot must continuously sense lane markings using its onboard camera, process this visual data to determine its position relative to the lane center, and act by adjusting its steering to maintain proper alignment.
+The main motivation behind this project is to apply the "Sense-Plan-Act" cycle that is central to autonomous robotics. Lane following is a good starting point because it covers the basics of robotics in a controlled setting. The robot needs to sense the lane using its camera, figure out where it is relative to the lane center, and then adjust its steering to stay on track.
 
-We chose to work in simulation using Gazebo and ROS2 for several practical reasons. Simulation provides a safe environment to develop and test algorithms without risking damage to physical hardware. It also allows for rapid iteration and debugging, as the environment can be easily reset and parameters can be quickly adjusted. The TurtleBot3 platform was selected because it is a well-documented, widely-used robot in educational settings and comes equipped with the sensors needed for this task.
+We decided to use the Gazebo simulator along with ROS2 for this project. Working in simulation allows us to test our code safely without the risk of damaging actual hardware. It also makes it easier to reset the environment and tweak settings during development. We chose the TurtleBot3 (waffle_pi model) because it is commonly used in robotics education and comes with a built-in camera sensor.
 
-This project is directly relevant to CSCI 4551 (Robotics) as it integrates multiple core concepts covered in the course:
+This project ties directly into several topics covered in our CSCI 4551 Robotics course:
 
-- **Computer Vision**: We apply OpenCV-based image processing techniques including color space conversion (BGR to HSV), thresholding, morphological operations, and moment-based centroid detection to identify lane markings.
+- **OpenCV and Image Filtering**: We use OpenCV to process camera images. This includes converting color spaces (BGR to HSV), applying threshold filters to isolate lane markings, and using morphological operations to clean up noise in the image.
 
-- **Locomotion and Control**: The system implements a proportional controller that converts perceived lane error into appropriate steering commands, demonstrating closed-loop feedback control.
+- **Sensors and Locomotion**: The robot relies on its camera sensor to perceive the lane. Based on that sensor input, the system sends velocity commands to control the robot's movement and steering.
 
-- **ROS2 Middleware**: The project architecture uses ROS2's publish-subscribe communication pattern with separate vision and controller nodes, showcasing modular robotic system design.
+- **Motion Planning**: While this project uses a simple proportional controller rather than full path planning, it demonstrates the basic idea of converting sensor feedback into planned motion commands.
 
-- **Simulation**: Working with Gazebo and custom world files demonstrates how simulation environments are used in robotics development pipelines.
+- **State Estimation**: The vision system estimates the robot's position relative to the lane center by calculating a normalized error value. This error serves as a simple form of state estimation that the controller uses to make decisions.
 
-By completing this project, we gain hands-on experience with the complete pipeline from perception to actuation, preparing us to tackle more complex autonomous systems in the future.
+- **ROS2**: The project is built using ROS2's publish-subscribe architecture. We have separate nodes for vision processing and motor control that communicate through ROS2 topics.
+
+By working on this project, we get practical experience connecting perception to action, which is the foundation for more advanced topics like SLAM and full autonomous navigation.
 
 ## Methodology
 - How did you do what you did?
