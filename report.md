@@ -2,94 +2,44 @@
 
 ## Introduction/Motivation
 
-Autonomous navigation is a core challenge in robotics with real-world applications in self-driving cars, delivery robots, and warehouse automation. This project focuses on building a lane-following system for a simulated TurtleBot3 robot. The goal is to show how a robot can use its camera sensor to see the environment and convert that visual data into movement commands.
-
-The main motivation behind this project is to apply the "Sense-Plan-Act" cycle that is central to autonomous robotics. Lane following is a good starting point because it covers the basics of robotics in a controlled setting. The robot needs to sense the lane using its camera, figure out where it is relative to the lane center, and then adjust its steering to stay on track.
-
-We decided to use the Gazebo simulator along with ROS2 for this project. Working in simulation allows us to test our code safely without the risk of damaging actual hardware. It also makes it easier to reset the environment and tweak settings during development. We chose the TurtleBot3 (waffle_pi model) because it is commonly used in robotics education and comes with a built-in camera sensor.
-
-This project ties directly into several topics covered in our CSCI 4551 Robotics course:
-
-- **OpenCV and Image Filtering**: We use OpenCV to process camera images. This includes converting color spaces (BGR to HSV), applying threshold filters to isolate lane markings, and using morphological operations to clean up noise in the image.
-
-- **Sensors and Locomotion**: The robot relies on its camera sensor to perceive the lane. Based on that sensor input, the system sends velocity commands to control the robot's movement and steering.
-
-- **Motion Planning**: While this project uses a simple proportional controller rather than full path planning, it demonstrates the basic idea of converting sensor feedback into planned motion commands.
-
-- **State Estimation**: The vision system estimates the robot's position relative to the lane center by calculating a normalized error value. This error serves as a simple form of state estimation that the controller uses to make decisions.
-
-- **ROS2**: The project is built using ROS2's publish-subscribe architecture. We have separate nodes for vision processing and motor control that communicate through ROS2 topics.
-
-By working on this project, we get practical experience connecting perception to action, which is the foundation for more advanced topics like SLAM and full autonomous navigation.
+Autonomous navigation is a core challenge in robotics with real-world applications in self-driving cars, delivery robots, and warehouse automation. Our project focuses on building a lane-following system for a simulated turtlebot robot. We hope to show how a robot can use its camera sensor to the environment and convert that visual data into movement commands. Our project is relevant to the course because it incorporates what we have learned about ROS, computer vision, and the "sense-plan-act" cycle that is central to robotics.
 
 ## Methodology
 
-### System Architecture
-
-The project uses a two-node ROS2 architecture where each node handles a specific task. The first node (vision node) processes camera images to detect the lane, and the second node (controller node) uses that information to steer the robot. These nodes communicate through a ROS2 topic called `/lane_error`.
-
-![System Architecture Diagram - Vision Node publishes lane error, Controller Node subscribes and sends velocity commands]
+Our system is built using ROS2 and runs in the Gazebo simulator. We use the TurtleBot3 (waffle_pi model) because it comes with a camera sensor. The project is split into two main parts: a vision node that detects the lane, and a controller node that steers the robot.
 
 ### Vision Node
 
-The vision node is responsible for detecting the lane and calculating how far off-center the robot is. Here is how the image processing pipeline works:
+The vision node handles all the image processing. It receives camera images and figures out where the lane is. Here is how it works:
 
-1. **Image Acquisition**: The node subscribes to the `/camera/image_raw` topic to receive live camera feed from the TurtleBot3's onboard camera. We use the `cv_bridge` library to convert ROS Image messages into OpenCV format.
+1. **Get the image**: The node subscribes to the camera topic and uses cv_bridge to convert the ROS image into an OpenCV format we can work with.
 
-2. **Region of Interest (ROI)**: Instead of processing the entire image, we only look at the bottom 40% of the frame. This is where the lane markings are most visible and relevant for steering decisions.
+2. **Focus on the road**: We crop the image to only look at the bottom 40%. This is where the lane markings actually appear, so there is no point processing the sky or background.
 
-3. **Color Space Conversion**: The image is converted from BGR to HSV color space. HSV makes it easier to filter colors because it separates color information (hue) from brightness (value).
+3. **Convert to HSV**: We convert the image from BGR to HSV color space. This makes it easier to filter out specific colors regardless of lighting conditions.
 
-4. **Threshold Filtering**: We apply a threshold to isolate white lane markings. The HSV range used is:
-   - Hue: 0 to 180 (any color)
-   - Saturation: 0 to 50 (low saturation for white)
-   - Value: 200 to 255 (high brightness)
+4. **Filter for white**: We apply a threshold to find white pixels. White has low saturation (0-50) and high brightness (200-255). Everything else gets filtered out.
 
-5. **Morphological Operations**: A morphological "opening" operation is applied using a 5x5 kernel. This removes small noise pixels from the binary mask while preserving the lane shape.
+5. **Clean up noise**: We use a morphological opening operation to remove small dots and noise from the image while keeping the lane shape intact.
 
-6. **Centroid Calculation**: Using OpenCV's `moments()` function, we find the center of the detected white pixels. This gives us the x-coordinate of where the lane appears in the image.
+6. **Find the lane center**: Using OpenCV's moments function, we calculate the center point of all the white pixels. This tells us where the lane is in the image.
 
-7. **Error Calculation**: The lane error is calculated as a normalized value:
-   ```
-   error = (lane_center_x - image_center_x) / image_center_x
-   ```
-   This gives a value between -1 and 1, where 0 means the robot is centered, negative means the lane is to the left, and positive means it is to the right.
+7. **Calculate the error**: We compare where the lane center is versus where the image center is. The result is a number between -1 and 1 that tells us how far off-center the robot is.
 
-8. **Error Persistence**: If the lane is temporarily lost (no white pixels detected), the node keeps publishing the last known error value. This prevents the robot from making sudden erratic movements.
-
-The vision node publishes the error value to the `/lane_error` topic at 5 Hz.
+If the lane is temporarily lost, the node keeps using the last known error value so the robot does not make sudden jerky movements.
 
 ### Controller Node
 
-The controller node takes the lane error and converts it into movement commands for the robot. It uses a simple proportional (P) controller:
+The controller node is simpler. It listens for the lane error and converts it into steering commands:
 
-1. **Subscribing to Error**: The node listens to the `/lane_error` topic to receive the current lane position error.
+- **Forward speed**: Always set to 0.2 m/s
+- **Steering**: Calculated as the error multiplied by -0.5 (the proportional gain)
 
-2. **Velocity Commands**: For each error value received, the controller calculates:
-   - **Linear velocity**: Fixed at 0.2 m/s (constant forward speed)
-   - **Angular velocity**: Calculated as `-Kp * error`, where Kp = 0.5
+When the error is positive (lane is to the right), the robot turns right. When the error is negative (lane is to the left), the robot turns left. The robot publishes these velocity commands to the `/cmd_vel` topic.
 
-3. **Publishing Commands**: The velocity commands are published as `TwistStamped` messages to the `/cmd_vel` topic, which the TurtleBot3 listens to for movement instructions.
+### Simulation Setup
 
-The negative sign in the angular velocity formula ensures that when the lane is detected to the right (positive error), the robot turns right to correct, and vice versa.
-
-### Simulation Environment
-
-The simulation runs in Gazebo using a custom track world. Key components include:
-
-- **Track Model**: A custom 3D track mesh created in Blender and exported as a `.dae` file. The track features white lane markings on a dark surface.
-- **TurtleBot3 Waffle Pi**: This robot model includes an RGB camera sensor needed for lane detection.
-- **Physics Engine**: ODE physics engine running at 1000 Hz for realistic robot movement.
-- **Spawn Position**: The robot starts at coordinates (3.0, 4.0) on the track.
-
-### Launch System
-
-A single launch file (`launch_project.py`) starts the entire system:
-1. Sets the TurtleBot3 model to `waffle_pi`
-2. Configures Gazebo resource paths for models
-3. Launches the Gazebo simulator with the custom track world
-4. Spawns the TurtleBot3 in the simulation
-5. Starts both the vision node and controller node
+We built a custom track in Blender with white lane markings on a dark surface. The track is loaded into Gazebo along with the TurtleBot3. A launch file starts everything at once: it opens Gazebo, spawns the robot on the track, and starts both nodes.
 
 ### Work Distribution
 
